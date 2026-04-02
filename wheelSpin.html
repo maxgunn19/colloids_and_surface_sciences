@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fast Name Picker Wheel</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #f0f2f5;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            display: flex;
+            gap: 30px;
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        .input-section {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        textarea {
+            width: 200px;
+            height: 350px;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            resize: none;
+            font-size: 14px;
+        }
+
+        .wheel-container {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        #wheelCanvas {
+            border-radius: 50%;
+            border: 5px solid #333;
+        }
+
+        .pointer {
+            position: absolute;
+            top: -10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;
+            height: 0;
+            border-left: 15px solid transparent;
+            border-right: 15px solid transparent;
+            border-top: 30px solid #e74c3c;
+            z-index: 10;
+        }
+
+        button {
+            margin-top: 20px;
+            padding: 12px 30px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: white;
+            background-color: #3498db;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        button:hover { background-color: #2980b9; }
+        button:disabled { background-color: #bdc3c7; cursor: not-allowed; }
+
+        #winner {
+            margin-top: 15px;
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #2c3e50;
+            height: 1.6em;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Name Picker Wheel</h1>
+
+    <div class="container">
+        <div class="input-section">
+            <label for="namesInput">Names (one per line):</label>
+            <textarea id="namesInput" placeholder="Enter names here...">Elena
+Timo
+London
+Jack
+Melvin
+Kaelin
+Derek
+James
+Moriah
+Aurea
+Kyle R
+Lauren
+Hailey
+Emma
+Annie
+Jacob
+Kyle T</textarea>
+        </div>
+
+        <div class="wheel-container">
+            <div class="pointer"></div>
+            <canvas id="wheelCanvas" width="400" height="400"></canvas>
+            <button id="spinBtn">SPIN</button>
+            <div id="winner"></div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('wheelCanvas');
+        const ctx = canvas.getContext('2d');
+        const spinBtn = document.getElementById('spinBtn');
+        const namesInput = document.getElementById('namesInput');
+        const winnerDisplay = document.getElementById('winner');
+
+        let names = [];
+        let currentRotation = 0;
+        let isSpinning = false;
+
+        const colors = ['#f1c40f', '#e67e22', '#e74c3c', '#9b59b6', '#3498db', '#2ecc71', '#1abc9c'];
+
+        function drawWheel() {
+            const lines = namesInput.value.split('\n').filter(n => n.trim() !== "");
+            names = lines;
+            
+            const numSegments = names.length;
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            const radius = canvas.width / 2;
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            if (numSegments === 0) {
+                ctx.fillStyle = "#ccc";
+                ctx.beginPath();
+                ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+                ctx.fill();
+                return;
+            }
+
+            const arcSize = (Math.PI * 2) / numSegments;
+
+            names.forEach((name, i) => {
+                const angle = currentRotation + (i * arcSize);
+                
+                ctx.beginPath();
+                ctx.fillStyle = colors[i % colors.length];
+                ctx.moveTo(centerX, centerY);
+                ctx.arc(centerX, centerY, radius, angle, angle + arcSize);
+                ctx.lineTo(centerX, centerY);
+                ctx.fill();
+                ctx.strokeStyle = "rgba(0,0,0,0.1)";
+                ctx.stroke();
+
+                ctx.save();
+                ctx.translate(centerX, centerY);
+                ctx.rotate(angle + arcSize / 2);
+                ctx.textAlign = "right";
+                ctx.fillStyle = "white";
+                ctx.font = "bold 16px sans-serif";
+                ctx.shadowBlur = 2;
+                ctx.shadowColor = "black";
+                ctx.fillText(name, radius - 20, 6);
+                ctx.restore();
+            });
+        }
+
+        function spin() {
+            if (isSpinning || names.length === 0) return;
+
+            isSpinning = true;
+            spinBtn.disabled = true;
+            winnerDisplay.textContent = "";
+
+            // Timing: 500ms (0.5s) to 1500ms (1.5s)
+            const duration = 500 + (Math.random() * 1000); 
+            const startRotation = currentRotation;
+            // Ensure at least 10 full rotations for speed
+            const totalSpins = (Math.PI * 2) * (10 + Math.random() * 10); 
+            const startTime = performance.now();
+
+            function animate(currentTime) {
+                const elapsed = currentTime - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+
+                // Ease out cubic: starts fast, slows down at the end
+                const easeOut = 1 - Math.pow(1 - progress, 3);
+                
+                currentRotation = startRotation + (totalSpins * easeOut);
+                
+                drawWheel();
+
+                if (progress < 1) {
+                    requestAnimationFrame(animate);
+                } else {
+                    finishSpin();
+                }
+            }
+
+            requestAnimationFrame(animate);
+        }
+
+        function finishSpin() {
+            isSpinning = false;
+            spinBtn.disabled = false;
+
+            const numSegments = names.length;
+            const arcSize = (Math.PI * 2) / numSegments;
+            
+            // Calculate winner relative to top pointer (1.5 * PI)
+            let normalizedRotation = (currentRotation % (Math.PI * 2));
+            let winningIndex = Math.floor(( (Math.PI * 1.5) - normalizedRotation ) / arcSize) % numSegments;
+            if (winningIndex < 0) winningIndex += numSegments;
+
+            const winner = names[winningIndex];
+            winnerDisplay.textContent = `🎉 ${winner}!`;
+
+            // Optional: Auto-remove the winner after 1 second
+            setTimeout(() => {
+                if (names.length > 1) {
+                    names.splice(winningIndex, 1);
+                    namesInput.value = names.join('\n');
+                    drawWheel();
+                }
+            }, 1200);
+        }
+
+        namesInput.addEventListener('input', drawWheel);
+        spinBtn.addEventListener('click', spin);
+
+        drawWheel();
+    </script>
+</body>
+</html>
